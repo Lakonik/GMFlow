@@ -1,0 +1,10 @@
+git+https://github.com/open-mmlab/mmcv.git@d409eedc816fccfb1c8d57e5eed5f03bd075f327
+git+https://github.com/Lakonik/mmgeneration.git@500a93e474638c87dcaf8fad94cfbe1ef29acd1f
+git+https://github.com/huggingface/diffusers.git@57084dacc5275d7212513b24837b60a28e55603d
+transformers
+torchsde
+tensorboard
+setuptools
+apex==0.9.10dev
+bitsandbytes
+yapf==0.40.1
