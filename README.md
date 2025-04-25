@@ -23,7 +23,7 @@ Official PyTorch implementation of the paper:
 
 GMFlow is an extension of diffusion/flow matching models.
 
-- **Gaussian Mixture Output**: GMFlow expands the network's output layer to predict a Gaussian Mixture (GM) distribution of flow velocity. Standard diffusion/flow matching models are special cases of GMFlow with a single Gaussian component.
+- **Gaussian Mixture Output**: GMFlow expands the network's output layer to predict a Gaussian mixture (GM) distribution of flow velocity. Standard diffusion/flow matching models are special cases of GMFlow with a single Gaussian component.
 
 - **Precise Few-Step Sampling**: GMFlow introduces novel **GM-SDE** and **GM-ODE** solvers that leverage analytic denoising distributions and velocity fields for precise few-step sampling.
 
