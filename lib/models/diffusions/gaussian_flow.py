@@ -61,11 +61,17 @@ class GaussianFlow(nn.Module):
         return x_0 * mean + noise * std, mean, std
 
     def pred(self, x_t, t, **kwargs):
+        ori_dtype = x_t.dtype
         x_t = x_t.to(next(self.denoising.parameters()).dtype)
         num_batches = x_t.size(0)
         if t.dim() == 0 or len(t) != num_batches:
             t = t.expand(num_batches)
-        return self.denoising(x_t, t, **kwargs)
+        output = self.denoising(x_t, t, **kwargs)
+        if isinstance(output, dict):
+            output = {k: v.to(ori_dtype) for k, v in output.items()}
+        else:
+            output = output.to(ori_dtype)
+        return output
 
     @force_fp32()
     def loss(self, denoising_output, x_0, noise, t, pred_mask=None):
@@ -158,8 +164,6 @@ class GaussianFlow(nn.Module):
             denoising_output = self.pred(x_t_input, t, **kwargs)
 
             if isinstance(denoising_output, dict):  # for gmflow compatibility
-                denoising_output = {k: v.to(torch.float32) for k, v in denoising_output.items()}
-
                 if use_guidance:
                     gm_pos = {k: v[num_batches:] for k, v in denoising_output.items()}
                     gm_neg = {k: v[:num_batches] for k, v in denoising_output.items()}

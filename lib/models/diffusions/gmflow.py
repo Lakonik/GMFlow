@@ -345,7 +345,6 @@ class GMFlow(GaussianFlow, GMFlowMixin):
         GMFlow transition loss.
         """
         with torch.autocast(device_type='cuda', enabled=False):
-            denoising_output = {k: v.float() for k, v in denoising_output.items()}
             x_t_low = x_t_low.float()
             x_t_high = x_t_high.float()
             t_low = t_low.float()
@@ -368,7 +367,6 @@ class GMFlow(GaussianFlow, GMFlowMixin):
             num_channels = x_0.size(-3)
 
             with torch.no_grad():
-                denoising_output = {k: v.float() for k, v in denoising_output.items()}
                 output_g = self.u_to_x_0(gm_to_iso_gaussian(denoising_output)[0], x_t, t)
                 u = (x_t - x_0) * inv_sigma
                 z_kr = gm_samples_to_gaussian_samples(
@@ -484,7 +482,6 @@ class GMFlow(GaussianFlow, GMFlowMixin):
 
             gm_output = self.pred(x_t_input, t, **kwargs)
             assert isinstance(gm_output, dict)
-            gm_output = {k: v.to(torch.float32) for k, v in gm_output.items()}
             gm_output = self.u_to_x_0(gm_output, x_t_input, t)
 
             # ========== Probabilistic CFG ==========
