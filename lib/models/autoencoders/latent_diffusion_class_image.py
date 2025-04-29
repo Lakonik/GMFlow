@@ -59,13 +59,12 @@ class LatentDiffusionClassImage(nn.Module):
         for v in optimizer.values():
             v.zero_grad()
 
-        diffusion_dtype = next(self.diffusion.parameters()).dtype
         with torch.autocast(
                 device_type='cuda',
                 enabled=self.autocast_dtype is not None,
                 dtype=getattr(torch, self.autocast_dtype) if self.autocast_dtype is not None else None):
             loss, log_vars = self.diffusion(
-                data['latents'].to(diffusion_dtype),
+                data['latents'],
                 return_loss=True,
                 class_labels=labels)
 
@@ -127,15 +126,14 @@ class LatentDiffusionClassImage(nn.Module):
             if guidance_scale != 0.0 and guidance_scale != 1.0:
                 class_labels = torch.cat([data['negative_labels'], class_labels], dim=0)
 
-            diffusion_dtype = next(diffusion.parameters()).dtype
             with torch.autocast(
                     device_type='cuda',
                     enabled=self.autocast_dtype is not None,
                     dtype=getattr(torch, self.autocast_dtype) if self.autocast_dtype is not None else None):
                 if 'noise' in data:
-                    noise = data['noise'].to(diffusion_dtype)
+                    noise = data['noise']
                 else:
-                    noise = torch.randn((bs, c, h, w), device=data['labels'].device, dtype=diffusion_dtype)
+                    noise = torch.randn((bs, c, h, w), device=data['labels'].device)
                 latents_out = diffusion(
                     noise=noise,
                     class_labels=class_labels,

@@ -422,6 +422,10 @@ class GMFlow(GaussianFlow, GMFlowMixin):
             self, x_0=None, noise=None, guidance_scale=0.0,
             test_cfg_override=dict(), show_pbar=False, **kwargs):
         x_t = torch.randn_like(x_0) if noise is None else noise
+        num_batches = x_t.size(0)
+        ori_dtype = x_t.dtype
+        x_t = x_t.float()
+
         cfg = deepcopy(self.test_cfg)
         cfg.update(test_cfg_override)
 
@@ -474,23 +478,17 @@ class GMFlow(GaussianFlow, GMFlowMixin):
                 self.intermediate_x_t.append(x_t)
                 self.intermediate_t.append(t)
 
-            model_input = x_t
+            x_t_input = x_t
             if use_guidance:
-                model_input = torch.cat([x_t, model_input], dim=0)
+                x_t_input = torch.cat([x_t_input, x_t_input], dim=0)
 
-            gm_output = self.pred(model_input, t, **kwargs)
+            gm_output = self.pred(x_t_input, t, **kwargs)
             assert isinstance(gm_output, dict)
-
-            ori_dtype = gm_output['means'].dtype
             gm_output = {k: v.to(torch.float32) for k, v in gm_output.items()}
-            x_t = x_t.to(torch.float32)
-            model_input = model_input.to(torch.float32)
-
-            gm_output = self.u_to_x_0(gm_output, model_input, t)
+            gm_output = self.u_to_x_0(gm_output, x_t_input, t)
 
             # ========== Probabilistic CFG ==========
             if use_guidance:
-                num_batches = x_t.size(0)
                 gm_cond = {k: v[num_batches:] for k, v in gm_output.items()}
                 gm_uncond = {k: v[:num_batches] for k, v in gm_output.items()}
                 uncond_mean = gm_to_mean(gm_uncond)
@@ -546,15 +544,13 @@ class GMFlow(GaussianFlow, GMFlowMixin):
             if save_intermediate:
                 self.intermediate_x_0.append(model_output)
 
-            x_t = x_t.to(ori_dtype)
-
             if show_pbar:
                 pbar.update()
 
         if show_pbar:
             sys.stdout.write('\n')
 
-        return x_t
+        return x_t.to(ori_dtype)
 
     def forward_likelihood(self, x_0, *args, **kwargs):
         device = get_module_device(self)

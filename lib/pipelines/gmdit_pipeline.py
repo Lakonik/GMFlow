@@ -239,7 +239,6 @@ class GMDiTPipeline(DiTPipeline, GMFlowPipelineMixin):
             shape=(batch_size, latent_channels, latent_size, latent_size),
             generator=generator,
             device=self._execution_device,
-            dtype=self.transformer.dtype,
         )
 
         class_labels = torch.tensor(class_labels, device=self._execution_device).reshape(-1)
@@ -254,19 +253,16 @@ class GMDiTPipeline(DiTPipeline, GMFlowPipelineMixin):
         for timestep_id in self.progress_bar(range(num_inference_steps)):
             t = self.scheduler.timesteps[timestep_id * num_inference_substeps]
 
-            model_input = x_t
+            x_t_input = x_t
             if use_guidance:
-                model_input = torch.cat([model_input, x_t], dim=0)
+                x_t_input = torch.cat([x_t_input, x_t], dim=0)
 
             gm_output = self.transformer(
-                model_input, timestep=t.expand(model_input.size(0)), class_labels=class_labels_input)
-
-            ori_dtype = gm_output['means'].dtype
+                x_t_input.to(dtype=self.transformer.dtype),
+                timestep=t.expand(x_t_input.size(0)),
+                class_labels=class_labels_input)
             gm_output = {k: v.to(torch.float32) for k, v in gm_output.items()}
-            x_t = x_t.to(torch.float32)
-            model_input = model_input.to(torch.float32)
-
-            gm_output = self.u_to_x_0(gm_output, model_input, t)
+            gm_output = self.u_to_x_0(gm_output, x_t_input, t)
 
             # ========== Probabilistic CFG ==========
             if use_guidance:
@@ -314,10 +310,8 @@ class GMDiTPipeline(DiTPipeline, GMFlowPipelineMixin):
                         gm_output, x_t, x_t_base, t, t_base, prediction_type='x0')
                 x_t = self.scheduler.step(model_output, t, x_t, return_dict=False, prediction_type='x0')[0]
 
-            x_t = x_t.to(ori_dtype)
-
         x_t = x_t / self.vae.config.scaling_factor
-        samples = self.vae.decode(x_t).sample
+        samples = self.vae.decode(x_t.to(self.vae.dtype)).sample
 
         samples = (samples / 2 + 0.5).clamp(0, 1)
         samples = samples.cpu().permute(0, 2, 3, 1).float().numpy()

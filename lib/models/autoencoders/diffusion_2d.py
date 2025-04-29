@@ -47,13 +47,12 @@ class Diffusion2D(nn.Module):
         for v in optimizer.values():
             v.zero_grad()
 
-        diffusion_dtype = next(self.diffusion.parameters()).dtype
         with torch.autocast(
                 device_type='cuda',
                 enabled=self.autocast_dtype is not None,
                 dtype=getattr(torch, self.autocast_dtype) if self.autocast_dtype is not None else None):
             loss, log_vars = self.diffusion(
-                data['x'].to(diffusion_dtype).reshape(bs, 2, 1, 1),
+                data['x'].reshape(bs, 2, 1, 1),
                 return_loss=True)
 
         loss.backward() if loss_scaler is None else loss_scaler.scale(loss).backward()
@@ -93,15 +92,14 @@ class Diffusion2D(nn.Module):
         diffusion = self.diffusion_ema if self.diffusion_use_ema else self.diffusion
 
         with torch.no_grad():
-            diffusion_dtype = next(diffusion.parameters()).dtype
             with torch.autocast(
                     device_type='cuda',
                     enabled=self.autocast_dtype is not None,
                     dtype=getattr(torch, self.autocast_dtype) if self.autocast_dtype is not None else None):
                 if 'noise' in data:
-                    noise = data['noise'].reshape(bs, 2, 1, 1).to(diffusion_dtype)
+                    noise = data['noise'].reshape(bs, 2, 1, 1)
                 else:
-                    noise = torch.randn((bs, 2, 1, 1), device=data['x'].device, dtype=diffusion_dtype)
+                    noise = torch.randn((bs, 2, 1, 1), device=data['x'].device)
                 x_out = diffusion(
                     noise=noise,
                     test_cfg_override=test_cfg_override)

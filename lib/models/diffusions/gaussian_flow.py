@@ -61,6 +61,7 @@ class GaussianFlow(nn.Module):
         return x_0 * mean + noise * std, mean, std
 
     def pred(self, x_t, t, **kwargs):
+        x_t = x_t.to(next(self.denoising.parameters()).dtype)
         num_batches = x_t.size(0)
         if t.dim() == 0 or len(t) != num_batches:
             t = t.expand(num_batches)
@@ -116,6 +117,9 @@ class GaussianFlow(nn.Module):
             self, x_0=None, noise=None, guidance_scale=1.0,
             test_cfg_override=dict(), show_pbar=False, **kwargs):
         x_t = torch.randn_like(x_0) if noise is None else noise
+        ori_dtype = x_t.dtype
+        x_t = x_t.float()
+
         cfg = deepcopy(self.test_cfg)
         cfg.update(test_cfg_override)
 
@@ -147,14 +151,13 @@ class GaussianFlow(nn.Module):
             pbar = mmcv.ProgressBar(len(timesteps))
 
         for t in timesteps:
-            model_input = x_t
+            x_t_input = x_t
             if use_guidance:
-                model_input = torch.cat([x_t, model_input], dim=0)
+                x_t_input = torch.cat([x_t_input, x_t_input], dim=0)
 
-            denoising_output = self.pred(model_input, t, **kwargs)
+            denoising_output = self.pred(x_t_input, t, **kwargs)
 
             if isinstance(denoising_output, dict):  # for gmflow compatibility
-                ori_dtype = denoising_output['means'].dtype
                 denoising_output = {k: v.to(torch.float32) for k, v in denoising_output.items()}
 
                 if use_guidance:
@@ -171,8 +174,6 @@ class GaussianFlow(nn.Module):
                 else:
                     denoising_output = gm_to_sample(denoising_output).squeeze(-4)
 
-                denoising_output = denoising_output.to(ori_dtype)
-
             else:
                 assert output_mode == 'mean'
                 if use_guidance:
@@ -187,7 +188,7 @@ class GaussianFlow(nn.Module):
         if show_pbar:
             sys.stdout.write('\n')
 
-        return x_t
+        return x_t.to(ori_dtype)
 
     def forward(self, x_0=None, return_loss=False, **kwargs):
         if return_loss:
