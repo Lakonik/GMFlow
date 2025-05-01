@@ -4,6 +4,8 @@ Official PyTorch implementation of the paper:
 
 **Gaussian Mixture Flow Matching Models [[arXiv](https://arxiv.org/abs/2504.05304)]**
 <br>
+In ICML 2025
+<br>
 [Hansheng Chen](https://lakonik.github.io/)<sup>1</sup>, 
 [Kai Zhang](https://kai-46.github.io/website/)<sup>2</sup>,
 [Hao Tan](https://research.adobe.com/person/hao-tan/)<sup>2</sup>,
@@ -220,13 +222,10 @@ This full trainer is not optimized for the simple 2D checkerboard dataset, so GP
 
 ## Citation
 ```
-@misc{gmflow,
-      title={Gaussian Mixture Flow Matching Models}, 
-      author={Hansheng Chen and Kai Zhang and Hao Tan and Zexiang Xu and Fujun Luan and Leonidas Guibas and Gordon Wetzstein and Sai Bi},
-      year={2025},
-      eprint={2504.05304},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2504.05304}, 
+@inproceedings{gmflow,
+  title={Gaussian Mixture Flow Matching Models},
+  author={Hansheng Chen and Kai Zhang and Hao Tan and Zexiang Xu and Fujun Luan and Leonidas Guibas and Gordon Wetzstein and Sai Bi},
+  booktitle={ICML},
+  year={2025},
 }
 ```
