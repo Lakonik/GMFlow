@@ -13,9 +13,8 @@ from mmgen.core.runners.apex_amp_utils import apex_amp_initialize
 from mmgen.datasets import build_dataset
 from mmgen.utils import get_root_logger
 
-from lib.parallel import MMDistributedDataParallel
-from lib.core.ddp_wrapper import DistributedDataParallelWrapper
-from lib.core.optimizer import build_optimizers
+from lib.parallel import MMDistributedDataParallel, DistributedDataParallelWrapper
+from lib.runner.optimizer import build_optimizers
 from lib.datasets import build_dataloader
 
 

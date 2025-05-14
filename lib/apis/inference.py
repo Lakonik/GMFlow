@@ -3,7 +3,7 @@ import mmcv
 
 from mmgen.models import build_model
 
-from lib.runner.checkpoints import load_checkpoint
+from lib.runner.checkpoint import load_checkpoint
 from lib.runner.hooks.ema_hook import get_ori_key
 
 
