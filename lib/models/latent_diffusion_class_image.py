@@ -2,7 +2,6 @@
 
 import os
 import torch
-import torch.nn as nn
 
 from threading import Thread
 from PIL import Image
@@ -10,11 +9,12 @@ from copy import deepcopy
 from mmgen.models.builder import MODELS, build_module
 from mmgen.utils import get_root_logger
 
-from ...core import link_untrained_params
+from .base import BaseModel
+from ..core import link_untrained_params
 
 
 @MODELS.register_module()
-class LatentDiffusionClassImage(nn.Module):
+class LatentDiffusionClassImage(BaseModel):
 
     def __init__(self,
                  vae=dict(type='PretrainedVAE'),
@@ -70,30 +70,8 @@ class LatentDiffusionClassImage(nn.Module):
 
         loss.backward() if loss_scaler is None else loss_scaler.scale(loss).backward()
 
-        for k, v in optimizer.items():
-            grad_clip = self.train_cfg.get(k + '_grad_clip', 0.0)
-            grad_clip_begin_iter = self.train_cfg.get(k + '_grad_clip_begin_iter', 0)
-            grad_clip_skip_ratio = self.train_cfg.get(k + '_grad_clip_skip_ratio', 0.0)
-            if grad_clip > 0.0 and running_status['iteration'] >= grad_clip_begin_iter:
-                try:
-                    grad_norm = torch.nn.utils.clip_grad_norm_(
-                        getattr(self, k).parameters(), self.train_cfg[k + '_grad_clip'],
-                        error_if_nonfinite=True)
-                    if grad_clip_skip_ratio > 0 and grad_norm > grad_clip * grad_clip_skip_ratio:
-                        grad_norm = float('nan')
-                        v.zero_grad()
-                except RuntimeError:
-                    grad_norm = float('nan')
-                    v.zero_grad()
-                log_vars.update({k + '_grad_norm': grad_norm})
-            if loss_scaler is None:
-                v.step()
-            else:
-                loss_scaler.unscale_(v)
-                loss_scaler.step(v)
-
+        log_vars = self.step_optimizer(optimizer, loss_scaler, running_status, log_vars)
         log_vars = {k: float(v) for k, v in log_vars.items()}
-
         outputs_dict = dict(log_vars=log_vars, num_samples=bs)
 
         return outputs_dict
