@@ -218,7 +218,7 @@ This full trainer is not optimized for the simple 2D checkerboard dataset, so GP
     - [gmflow.py](lib/models/architecture/gmflow.py): GMDiT and SpectrumMLP
     - [toymodels.py](lib/models/architecture/toymodels.py): MLP toy model for the 2D checkerboard experiment.
 - GM math operations
-    - [gmflow_ops](lib/ops/gmflow_ops/): A complete library of analytical operations for GM and Gaussian distributions.
+    - [gmflow_ops](lib/ops/gmflow_ops/): A complete library of analytic operations for GM and Gaussian distributions.
 
 ## Citation
 ```
