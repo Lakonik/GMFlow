@@ -62,7 +62,11 @@ class GaussianFlow(nn.Module):
 
     def pred(self, x_t, t, **kwargs):
         ori_dtype = x_t.dtype
-        x_t = x_t.to(next(self.denoising.parameters()).dtype)
+        if hasattr(self.denoising, 'dtype'):
+            denoising_dtype = self.denoising.dtype
+        else:
+            denoising_dtype = next(self.denoising.parameters()).dtype
+        x_t = x_t.to(denoising_dtype)
         num_batches = x_t.size(0)
         if t.dim() == 0 or len(t) != num_batches:
             t = t.expand(num_batches)

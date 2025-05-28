@@ -7,37 +7,26 @@ import torch.nn.functional as F
 
 from typing import Dict, Any, Optional, Union, Tuple
 from collections import OrderedDict
-from copy import deepcopy
 from transformers import CLIPTextModel as _CLIPTextModel
 from transformers import CLIPTextModelWithProjection, T5EncoderModel, CLIPTokenizer, T5TokenizerFast
 from diffusers.models import UNet2DConditionModel as _UNet2DConditionModel
 from diffusers.models import ControlNetModel, AutoencoderKL, DiTTransformer2DModel
-from diffusers.models.lora import LoRALinearLayer
-from diffusers.models.attention_processor import Attention, LoRAXFormersAttnProcessor, LoRAAttnProcessor, LoRAAttnProcessor2_0, AttnProcessor, AttnProcessor2_0, XFormersAttnProcessor
+from diffusers.models.attention_processor import Attention
 from diffusers.models.autoencoders.vae import Decoder
 from diffusers.models.resnet import ResnetBlock2D
 from diffusers.models.modeling_utils import ModelMixin
 from diffusers.models.embeddings import Timesteps
-from diffusers.utils.import_utils import is_xformers_available
 
 from mmcv.runner import load_checkpoint, _load_checkpoint, load_state_dict
 from mmcv.cnn.utils import constant_init, kaiming_init
-from mmgen.models.builder import MODULES, build_module
+from mmgen.models.builder import MODULES
 from mmgen.utils import get_root_logger
 
 from ...core import rgetattr
 
 
-TEXT_ENCODER_ATTN_MODULE = '.self_attn'
-
-
 def ceildiv(a, b):
     return -(a // -b)
-
-
-MODULES.register_module(name='LoRAXFormersAttnProcessor', module=LoRAXFormersAttnProcessor)
-MODULES.register_module(name='LoRAAttnProcessor', module=LoRAAttnProcessor)
-MODULES.register_module(name='LoRAAttnProcessor2_0', module=LoRAAttnProcessor2_0)
 
 
 def autocast_patch(module, dtype=None, enabled=True):
@@ -236,86 +225,6 @@ class UNet2DConditionModel(_UNet2DConditionModel):
 
 
 @MODULES.register_module()
-class UNetLoRAWrapper(nn.Module):
-    def __init__(
-            self,
-            unet,
-            lora_layers=dict(
-                type='LoRAXFormersAttnProcessor',
-                rank=4)):
-        super().__init__()
-        self.unet: UNet2DConditionModel = build_module(unet)
-        lora_attn_procs = {}
-        for name in self.unet.attn_processors.keys():
-            cross_attention_dim = None if name.endswith('attn1.processor') \
-                else self.unet.config.cross_attention_dim
-            if name.startswith('mid_block'):
-                hidden_size = self.unet.config.block_out_channels[-1]
-            elif name.startswith('up_blocks'):
-                block_id = int(name[len("up_blocks.")])
-                hidden_size = list(reversed(self.unet.config.block_out_channels))[block_id]
-            elif name.startswith('down_blocks'):
-                block_id = int(name[len('down_blocks.')])
-                hidden_size = self.unet.config.block_out_channels[block_id]
-            lora_cfg = deepcopy(lora_layers)
-            lora_cfg.update(dict(
-                hidden_size=hidden_size,
-                cross_attention_dim=cross_attention_dim))
-            m = build_module(lora_cfg)
-            if isinstance(m, ReferenceAttnProc):
-                p = m.chained_proc
-            else:
-                p = m
-            autocast_patch(p.to_k_lora, enabled=False)
-            autocast_patch(p.to_v_lora, enabled=False)
-            autocast_patch(p.to_q_lora, enabled=False)
-            autocast_patch(p.to_out_lora, enabled=False)
-            lora_attn_procs[name] = m
-        self.unet.set_attn_processor(lora_attn_procs)
-        # self.lora_layers = torch.nn.ModuleList(self.unet.attn_processors.values())
-
-    @torch.no_grad()
-    def bake_lora_weights(self):
-        if torch.__version__ >= '2.0':
-            ordinary_attn = AttnProcessor2_0()
-        elif is_xformers_available():
-            ordinary_attn = XFormersAttnProcessor()
-        else:
-            ordinary_attn = AttnProcessor()
-
-        def expansion(lora: LoRALinearLayer):
-            # in x in -> in x out
-            eye = torch.eye(lora.down.weight.size(1))
-            eye = eye.to(lora.down.weight)
-            return lora(eye).T
-
-        def traverse(name: str, module: Attention):
-            if hasattr(module, "set_processor"):
-                baked_processor = module.processor
-                if isinstance(module.processor, ReferenceAttnProc):
-                    baked_processor = baked_processor.chained_proc
-                assert isinstance(baked_processor, (LoRAAttnProcessor, LoRAAttnProcessor2_0, LoRAXFormersAttnProcessor))
-                module.to_k.weight += expansion(baked_processor.to_k_lora)
-                module.to_v.weight += expansion(baked_processor.to_v_lora)
-                module.to_q.weight += expansion(baked_processor.to_q_lora)
-                module.to_out[0].weight += expansion(baked_processor.to_out_lora)
-                if isinstance(module.processor, ReferenceAttnProc):
-                    module.processor._modules.pop('chained_proc')
-                    module.processor.chained_proc = ordinary_attn
-                else:
-                    module.set_processor(ordinary_attn)
-    
-            for sub_name, child in module.named_children():
-                traverse(f"{name}.{sub_name}", child)
-
-        for name, module in self.named_children():
-            traverse(name, module)
-
-    def forward(self, *args, **kwargs):
-        return self.unet.forward(*args, **kwargs)
-
-
-@MODULES.register_module()
 class CLIPTextModel(_CLIPTextModel):
     def __init__(
             self,
@@ -377,95 +286,6 @@ class CLIPTextModel(_CLIPTextModel):
         else:
             logger = get_root_logger()
             load_checkpoint(self, self.pretrained, map_location='cpu', strict=False, logger=logger)
-
-
-@MODULES.register_module()
-class CLIPLoRAWrapper(nn.Module):
-    def __init__(
-            self,
-            text_encoder,
-            lora_layers=dict(
-                type='LoRAXFormersAttnProcessor',
-                rank=4)):
-        super().__init__()
-        self.text_encoder = build_module(text_encoder)
-        self.lora_scale = 1.0
-        lora_attn_procs = {}
-        for name, module in self.text_encoder.named_modules():
-            if name.endswith(TEXT_ENCODER_ATTN_MODULE):
-                lora_cfg = deepcopy(lora_layers)
-                lora_cfg.update(dict(
-                    hidden_size=module.out_proj.out_features,
-                    cross_attention_dim=None))
-                m = build_module(lora_cfg)
-                autocast_patch(m.to_k_lora, enabled=False)
-                autocast_patch(m.to_v_lora, enabled=False)
-                autocast_patch(m.to_q_lora, enabled=False)
-                autocast_patch(m.to_out_lora, enabled=False)
-                lora_attn_procs[name] = m
-        self._modify_text_encoder(lora_attn_procs)
-        self.lora_layers = nn.ModuleList(lora_attn_procs.values())
-
-    @property
-    def _lora_attn_processor_attr_to_text_encoder_attr(self):
-        return {
-            'to_q_lora': 'q_proj',
-            'to_k_lora': 'k_proj',
-            'to_v_lora': 'v_proj',
-            'to_out_lora': 'out_proj',
-        }
-
-    def _remove_text_encoder_monkey_patch(self):
-        # Loop over the CLIPAttention module of text_encoder
-        for name, attn_module in self.text_encoder.named_modules():
-            if name.endswith(TEXT_ENCODER_ATTN_MODULE):
-                # Loop over the LoRA layers
-                for _, text_encoder_attr in self._lora_attn_processor_attr_to_text_encoder_attr.items():
-                    # Retrieve the q/k/v/out projection of CLIPAttention
-                    module = attn_module.get_submodule(text_encoder_attr)
-                    if hasattr(module, "old_forward"):
-                        # restore original `forward` to remove monkey-patch
-                        module.forward = module.old_forward
-                        delattr(module, "old_forward")
-
-    def _modify_text_encoder(self, attn_processors):
-        r"""
-        Monkey-patches the forward passes of attention modules of the text encoder.
-
-        Parameters:
-            attn_processors: Dict[str, `LoRAAttnProcessor`]:
-                A dictionary mapping the module names and their corresponding [`~LoRAAttnProcessor`].
-        """
-
-        # First, remove any monkey-patch that might have been applied before
-        self._remove_text_encoder_monkey_patch()
-
-        # Loop over the CLIPAttention module of text_encoder
-        for name, attn_module in self.text_encoder.named_modules():
-            if name.endswith(TEXT_ENCODER_ATTN_MODULE):
-                # Loop over the LoRA layers
-                for attn_proc_attr, text_encoder_attr in self._lora_attn_processor_attr_to_text_encoder_attr.items():
-                    # Retrieve the q/k/v/out projection of CLIPAttention and its corresponding LoRA layer.
-                    module = attn_module.get_submodule(text_encoder_attr)
-                    lora_layer = attn_processors[name].get_submodule(attn_proc_attr)
-
-                    # save old_forward to module that can be used to remove monkey-patch
-                    old_forward = module.old_forward = module.forward
-
-                    # create a new scope that locks in the old_forward, lora_layer value for each new_forward function
-                    # for more detail, see https://github.com/huggingface/diffusers/pull/3490#issuecomment-1555059060
-                    def make_new_forward(old_forward, lora_layer):
-                        def new_forward(x):
-                            result = old_forward(x) + self.lora_scale * lora_layer(x)
-                            return result
-
-                        return new_forward
-
-                    # Monkey-patch.
-                    module.forward = make_new_forward(old_forward, lora_layer)
-
-    def forward(self, *args, **kwargs):
-        return self.text_encoder.forward(*args, **kwargs)
 
 
 @MODULES.register_module()

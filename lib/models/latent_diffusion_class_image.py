@@ -118,7 +118,10 @@ class LatentDiffusionClassImage(BaseModel):
                     guidance_scale=guidance_scale,
                     test_cfg_override=test_cfg_override)
 
-            vae_dtype = next(self.vae.parameters()).dtype
+            if hasattr(self.vae, 'dtype'):
+                vae_dtype = self.vae.dtype
+            else:
+                vae_dtype = next(self.vae.parameters()).dtype
             latents_out = latents_out.to(vae_dtype)
 
             out_images = (self.vae.decode(latents_out).float() / 2 + 0.5).clamp(min=0, max=1)

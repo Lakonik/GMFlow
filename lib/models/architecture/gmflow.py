@@ -726,7 +726,7 @@ class _SpectrumMLP(ModelMixin, ConfigMixin):
     def forward(self, gaussian_output):
 
         ori_dtype = gaussian_output['mean'].dtype
-        spectral_mlp_dtype = next(self.parameters()).dtype
+        spectral_mlp_dtype = self.dtype
 
         output_stats = torch.stack(
             [gaussian_output['var'].mean(dim=(-3, -2, -1)),

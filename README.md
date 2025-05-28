@@ -53,8 +53,7 @@ conda activate gmflow
 # Goto https://pytorch.org/ to select the appropriate version
 pip install torch torchvision
 
-# Clone this repo and install other dependencies
-git clone https://github.com/Lakonik/GMFlow && cd gmflow
+# Install other dependencies
 pip install -r requirements.txt
 ```
 
