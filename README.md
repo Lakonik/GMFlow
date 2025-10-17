@@ -21,6 +21,10 @@ In ICML 2025
 
 <img src="gmdit_results.png" width="1000"  alt=""/>
 
+## 🔥News
+
+- [Oct 16, 2025] GMFlow is now fully merged into the **pi-Flow** codebase (see the new GMFlow code [here](https://github.com/Lakonik/piFlow/tree/main/configs/gmflow)). [pi-Flow](https://github.com/Lakonik/piFlow) introduces a novel imitation distillation method based on GMFlow for 1~4-step generation. 
+
 ## Highlights
 
 GMFlow is an extension of diffusion/flow matching models.
