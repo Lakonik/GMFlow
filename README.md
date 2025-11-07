@@ -23,6 +23,8 @@ In ICML 2025
 
 ## 🔥News
 
+- [Nov 7, 2025] GM-Qwen-Image and GM-FLUX is now available for [ComfyUI](https://github.com/comfyanonymous/ComfyUI) via the [ComfyUI-piFlow](https://github.com/Lakonik/ComfyUI-piFlow) extension. Supports 4-step sampling of Qwen-Image and Flux.1 dev using 8-bit models on a single consumer-grade GPU.
+
 - [Oct 16, 2025] GMFlow is now fully merged into the **pi-Flow** codebase (see the new GMFlow code [here](https://github.com/Lakonik/piFlow/tree/main/configs/gmflow)). [pi-Flow](https://github.com/Lakonik/piFlow) introduces a novel imitation distillation method based on GMFlow for 1~4-step generation. 
 
 ## Highlights
